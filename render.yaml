@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: chalah-md
+    env: node
+    buildCommand: npm install
+    startCommand: node index.js
+    envVars:
+      - key: PORT
+        value: 3000
+      - key: PANEL_URL
+        fromValue: https://your-app-name.onrender.com
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: GITHUB_REPO
+        value: ""
