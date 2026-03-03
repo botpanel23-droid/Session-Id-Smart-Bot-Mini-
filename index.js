@@ -20,6 +20,7 @@ const {
   makeCacheableSignalKeyStore,
   getContentType,
   downloadContentFromMessage,
+  Browsers,
 } = require('@whiskeysockets/baileys');
 
 const config = require('./src/config');
@@ -184,9 +185,11 @@ async function startBot() {
     sock = makeWASocket({
       version, logger, printQRInTerminal: false,
       auth: { creds: state.creds, keys: makeCacheableSignalKeyStore(state.keys, logger) },
-      browser: ['CHALAH-MD', 'Chrome', '3.0'],
+      browser: Browsers.ubuntu('Chrome'),
       markOnlineOnConnect: config.alwaysOnline,
       syncFullHistory: false, keepAliveIntervalMs: 25000,
+      connectTimeoutMs: 60000,
+      defaultQueryTimeoutMs: 60000,
     });
     sock.ev.on('creds.update', saveCreds);
     sock.ev.on('connection.update', async ({ connection, lastDisconnect }) => {
@@ -225,8 +228,11 @@ async function startQRSession() {
   sock = makeWASocket({
     version, logger, printQRInTerminal: false,
     auth: { creds: state.creds, keys: makeCacheableSignalKeyStore(state.keys, logger) },
-    browser: ['CHALAH-MD', 'Chrome', '3.0'],
-    markOnlineOnConnect: config.alwaysOnline, keepAliveIntervalMs: 25000,
+    browser: Browsers.ubuntu('Chrome'),
+    markOnlineOnConnect: config.alwaysOnline,
+    keepAliveIntervalMs: 25000,
+    connectTimeoutMs: 60000,
+    defaultQueryTimeoutMs: 60000,
   });
   sock.ev.on('creds.update', saveCreds);
 
@@ -274,8 +280,11 @@ async function startPairCodeSession(phoneNumber) {
   sock = makeWASocket({
     version, logger, printQRInTerminal: false,
     auth: { creds: state.creds, keys: makeCacheableSignalKeyStore(state.keys, logger) },
-    browser: ['CHALAH-MD', 'Chrome', '3.0'],
-    markOnlineOnConnect: config.alwaysOnline, keepAliveIntervalMs: 25000,
+    browser: Browsers.ubuntu('Chrome'),
+    markOnlineOnConnect: config.alwaysOnline,
+    keepAliveIntervalMs: 25000,
+    connectTimeoutMs: 60000,
+    defaultQueryTimeoutMs: 60000,
   });
   sock.ev.on('creds.update', saveCreds);
 
