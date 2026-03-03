@@ -1,9 +1,0 @@
-node_modules/
-auth_info/
-sessions/
-saved_status/
-*.log
-.env
-{src
-{bot,public}
-
