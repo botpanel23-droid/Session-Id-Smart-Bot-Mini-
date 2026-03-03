@@ -1,0 +1,22 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>CHALAH MD | Login</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>*{margin:0;padding:0;box-sizing:border-box}body{background:#030c06;font-family:'Rajdhani',sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;overflow:hidden}.bg{position:fixed;inset:0;background:radial-gradient(ellipse at 50% 0%,rgba(0,255,136,.06),transparent 60%)}.grid{position:fixed;inset:0;background-image:linear-gradient(rgba(0,255,136,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,255,136,.03) 1px,transparent 1px);background-size:50px 50px;animation:gm 20s linear infinite}@keyframes gm{0%{background-position:0 0}100%{background-position:0 50px}}.box{position:relative;z-index:10;background:rgba(10,30,13,.9);border:1px solid #0d3516;border-radius:16px;padding:40px;width:380px;backdrop-filter:blur(20px);box-shadow:0 0 60px rgba(0,255,136,.1)}.logo{text-align:center;margin-bottom:32px}.logo h1{font-family:'Orbitron',sans-serif;font-size:26px;color:#00ff88;font-weight:900;letter-spacing:4px;text-shadow:0 0 20px rgba(0,255,136,.5)}.logo p{color:#4d8a5f;font-size:12px;letter-spacing:2px;margin-top:4px}.fr{margin-bottom:16px}label{display:block;color:#00ff88;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px;font-weight:600}input{width:100%;padding:12px 14px;background:rgba(0,0,0,.4);border:1px solid #0d3516;border-radius:8px;color:#c8ffd8;font-family:'Rajdhani',sans-serif;font-size:15px;transition:all .2s}input:focus{outline:none;border-color:#00ff88;box-shadow:0 0 15px rgba(0,255,136,.15)}.btn{width:100%;padding:14px;background:linear-gradient(135deg,#00ff88,#00cc66);border:none;border-radius:8px;color:#000;font-family:'Orbitron',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:all .3s;letter-spacing:2px;margin-top:8px}.btn:hover{box-shadow:0 0 30px rgba(0,255,136,.4);transform:translateY(-1px)}.err{color:#ff4466;font-size:13px;text-align:center;margin-top:12px;padding:10px;background:rgba(255,68,102,.1);border:1px solid rgba(255,68,102,.2);border-radius:6px;display:none}.info{color:#4d8a5f;font-size:12px;text-align:center;margin-top:16px;line-height:1.8}.info a{color:#00ff88;text-decoration:none}</style></head>
+<body><div class="bg"></div><div class="grid"></div>
+<div class="box"><div class="logo"><h1>💎 CHALAH MD</h1><p>WHATSAPP BOT PANEL</p></div>
+<div class="fr"><label>📱 WhatsApp Number</label><input type="tel" id="number" placeholder="94xxxxxxxxx"></div>
+<div class="fr"><label>🔐 OTP Code</label><input type="text" id="otp" placeholder="6-digit OTP from WhatsApp" maxlength="6"></div>
+<button class="btn" onclick="login()">🚀 LOGIN TO PANEL</button>
+<div class="err" id="err"></div>
+<div class="info">Bot connect කරලා නෑ ද? <a href="/connect">→ Connect here</a></div></div>
+<script>
+document.getElementById('otp').addEventListener('keydown',e=>{if(e.key==='Enter')login()});
+async function login(){
+  const number=document.getElementById('number').value.trim(),otp=document.getElementById('otp').value.trim(),err=document.getElementById('err');
+  err.style.display='none';
+  if(!number||!otp){err.textContent='Number + OTP enter කරන්න!';err.style.display='block';return;}
+  const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({number,otp})});
+  const d=await r.json();
+  if(d.success)window.location.href='/';
+  else{err.textContent=d.message||'Login failed!';err.style.display='block';}
+}
+</script></body></html>
