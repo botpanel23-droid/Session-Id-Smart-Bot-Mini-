@@ -53,10 +53,7 @@ const deletedMsgs = new Map();
 
 // ══════════════════════════════════════════════════════
 //  SESSION ID SYSTEM
-//  Connect → auth_info bundle → base64 Session ID
-//  Redeploy → paste Session ID → auth_info restore → bot starts
 // ══════════════════════════════════════════════════════
-
 async function generateSessionId() {
   try {
     if (!fs.existsSync(path.join(AUTH_DIR, 'creds.json'))) return null;
@@ -73,13 +70,11 @@ async function generateSessionId() {
 async function restoreFromSessionId(sessionId) {
   try {
     if (!sessionId || !sessionId.startsWith('CHALAH3_')) {
-      return { success: false, message: 'Invalid Session ID. CHALAH3_ වලින් පටන් ගන්නා ID එකක් දාන්න.' };
+      return { success: false, message: 'Invalid Session ID. CHALAH3_ වලින් පටන් ගන්නා ID දාන්න.' };
     }
     const raw = Buffer.from(sessionId.replace('CHALAH3_', ''), 'base64').toString('utf8');
     const bundle = JSON.parse(raw);
-    if (!bundle['creds.json']) {
-      return { success: false, message: 'Session ID invalid - creds නෑ.' };
-    }
+    if (!bundle['creds.json']) return { success: false, message: 'Session ID invalid.' };
     await fs.remove(AUTH_DIR);
     await fs.ensureDir(AUTH_DIR);
     for (const [file, content] of Object.entries(bundle)) {
@@ -87,25 +82,44 @@ async function restoreFromSessionId(sessionId) {
     }
     return { success: true };
   } catch (e) {
-    return { success: false, message: 'Session ID decode error: ' + e.message };
+    return { success: false, message: 'Decode error: ' + e.message };
   }
 }
 
-// ─── Helpers ─────────────────────────────────────────────
-function writeStatus(data) {
-  try { fs.writeJsonSync(path.join(AUTH_DIR, 'pairing_status.json'), data); io.emit('statusUpdate', data); } catch (e) {}
-}
-
+// ══════════════════════════════════════════════════════
+//  CONNECT MESSAGE
+//  Plain text only - image send කරොත් "Waiting" error
+// ══════════════════════════════════════════════════════
 async function sendConnectMsg(s, botJid, botNum, otp, sessionId) {
-  const text = `╔═══════════════════════╗\n║  💎 *CHALAH MD CONNECTED!*  ║\n╚═══════════════════════╝\n\n✅ *Bot Connected!*\n📱 *Number:* ${botNum}\n🔐 *Panel OTP:* \`${otp}\`\n🌐 *Panel:* ${config.panelUrl}\n\n━━━━━━━━━━━━━━━━━━━━━━\n🔑 *SESSION ID* _(save කරගන්න!)_\n\n\`\`\`${sessionId || 'Generating...'}\`\`\`\n\n⚠️ _Redeploy කරද්දි මේ ID panel ට දාන්න. QR/Pair නොකර bot start වෙනවා!_\n\n> 💎 *CHALAH MD*`;
+  const text =
+    `╔═══════════════════════╗\n` +
+    `║  💎 *CHALAH MD CONNECTED!*  ║\n` +
+    `╚═══════════════════════╝\n\n` +
+    `✅ *Bot Connected!*\n` +
+    `📱 *Number:* ${botNum}\n` +
+    `🔐 *Panel OTP:* \`${otp}\`\n` +
+    `🌐 *Panel:* ${config.panelUrl}\n\n` +
+    `━━━━━━━━━━━━━━━━━━━━━━\n` +
+    `🔑 *SESSION ID* _(save කරගන්න!)_\n\n` +
+    `\`\`\`${sessionId || 'Generating...'}\`\`\`\n\n` +
+    `⚠️ _Redeploy කරද්දි Session ID tab paste කරන්න!_\n\n` +
+    `> 💎 *CHALAH MD*`;
   try {
-    await s.sendMessage(botJid, { image: { url: config.connectImage }, caption: text });
+    await s.sendMessage(botJid, { text });
   } catch (e) {
-    try { await s.sendMessage(botJid, { text }); } catch (e2) {}
+    console.error('[CONNECT MSG]', e.message);
   }
 }
 
-// ─── Bot Handlers ─────────────────────────────────────────
+// ─── Status writer ────────────────────────────────────
+function writeStatus(data) {
+  try {
+    fs.writeJsonSync(path.join(AUTH_DIR, 'pairing_status.json'), data);
+    io.emit('statusUpdate', data);
+  } catch (e) {}
+}
+
+// ─── Bot handlers ─────────────────────────────────────
 function attachHandlers(s) {
   s.ev.on('messages.upsert', async (m) => {
     if (!isConnected) return;
@@ -150,7 +164,7 @@ function attachHandlers(s) {
     for (const call of calls) {
       if (call.status === 'offer') {
         try { await s.rejectCall(call.id, call.from); } catch (e) {}
-        try { await s.sendMessage(call.from, { text: `🚫 *Call Rejected!*\nකරුණාකර call නොකරන්න!\n\n_AI generated_\n\n> 💎 *CHALAH MD*` }); } catch (e) {}
+        try { await s.sendMessage(call.from, { text: `🚫 *Call Rejected!*\nකරුණාකර call නොකරන්න!\n\n> 💎 *CHALAH MD*` }); } catch (e) {}
       }
     }
   });
@@ -165,7 +179,7 @@ function setupCron(botJid) {
         const st = await git.status();
         if (st.behind > 0) {
           await git.pull();
-          if (sock && isConnected) try { await sock.sendMessage(botJid, { text: `🔄 Auto Updated! Restarting...\n\n> 💎 *CHALAH MD*` }); } catch (e) {}
+          if (sock && isConnected) try { await sock.sendMessage(botJid, { text: `🔄 Auto Updated!\n\n> 💎 *CHALAH MD*` }); } catch (e) {}
           setTimeout(() => process.exit(0), 2000);
         }
       } catch (e) {}
@@ -187,9 +201,9 @@ async function startBot() {
       auth: { creds: state.creds, keys: makeCacheableSignalKeyStore(state.keys, logger) },
       browser: Browsers.ubuntu('Chrome'),
       markOnlineOnConnect: config.alwaysOnline,
-      syncFullHistory: false, keepAliveIntervalMs: 25000,
+      syncFullHistory: false,
+      keepAliveIntervalMs: 25000,
       connectTimeoutMs: 60000,
-      defaultQueryTimeoutMs: 60000,
     });
     sock.ev.on('creds.update', saveCreds);
     sock.ev.on('connection.update', async ({ connection, lastDisconnect }) => {
@@ -232,7 +246,6 @@ async function startQRSession() {
     markOnlineOnConnect: config.alwaysOnline,
     keepAliveIntervalMs: 25000,
     connectTimeoutMs: 60000,
-    defaultQueryTimeoutMs: 60000,
   });
   sock.ev.on('creds.update', saveCreds);
 
@@ -284,13 +297,11 @@ async function startPairCodeSession(phoneNumber) {
     markOnlineOnConnect: config.alwaysOnline,
     keepAliveIntervalMs: 25000,
     connectTimeoutMs: 60000,
-    defaultQueryTimeoutMs: 60000,
   });
   sock.ev.on('creds.update', saveCreds);
 
   return new Promise(async (resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error('Pair code timeout')), 30000);
-
+    const timeout = setTimeout(() => reject(new Error('Pair timeout')), 30000);
     sock.ev.on('connection.update', async ({ connection, lastDisconnect }) => {
       if (connection === 'open') {
         isConnected = true;
@@ -310,7 +321,6 @@ async function startPairCodeSession(phoneNumber) {
         if (code !== DisconnectReason.loggedOut) setTimeout(() => startBot(), 5000);
       }
     });
-
     await new Promise(r => setTimeout(r, 3000));
     try {
       const pairCode = await sock.requestPairingCode(phoneNumber);
@@ -339,43 +349,25 @@ app.post('/api/pair', async (req, res) => {
   catch (e) { res.json({ success: false, message: e.message }); }
 });
 
-// ── SESSION ID RESTORE ───────────────────────────────
 app.post('/api/restore-session', async (req, res) => {
   const { sessionId } = req.body;
   if (!sessionId) return res.json({ success: false, message: 'Session ID required' });
-
-  // Stop current bot
   if (sock) { try { sock.end(); sock.ws?.close(); } catch (e) {} sock = null; isConnected = false; }
-
   const result = await restoreFromSessionId(sessionId.trim());
   if (!result.success) return res.json(result);
-
-  // Start bot with restored session
-  try {
-    await startBot();
-    res.json({ success: true, message: '✅ Session restore! Bot starting...' });
-  } catch (e) {
-    res.json({ success: false, message: 'Restore ok but bot start failed: ' + e.message });
-  }
+  try { await startBot(); res.json({ success: true, message: '✅ Session restore! Bot starting...' }); }
+  catch (e) { res.json({ success: false, message: e.message }); }
 });
 
-// ── GET CURRENT SESSION ID ───────────────────────────
 app.get('/api/session-id', async (req, res) => {
   try {
-    // Try saved file first
     const savedPath = path.join(AUTH_DIR, 'session_id.txt');
     if (fs.existsSync(savedPath)) {
-      const id = fs.readFileSync(savedPath, 'utf8').trim();
-      return res.json({ success: true, sessionId: id });
+      return res.json({ success: true, sessionId: fs.readFileSync(savedPath, 'utf8').trim() });
     }
-    // Generate fresh
     const id = await generateSessionId();
-    if (id) {
-      fs.writeFileSync(savedPath, id);
-      res.json({ success: true, sessionId: id });
-    } else {
-      res.json({ success: false, message: 'Bot connect කරල නෑ. Session නෑ.' });
-    }
+    if (id) { fs.writeFileSync(savedPath, id); res.json({ success: true, sessionId: id }); }
+    else res.json({ success: false, message: 'Bot connect කරල නෑ.' });
   } catch (e) { res.json({ success: false, message: e.message }); }
 });
 
@@ -404,22 +396,20 @@ const requireAuth = (req, res, next) => req.session.authenticated ? next() : res
 
 app.get('/api/stats', requireAuth, (req, res) => {
   const s = database.getStats();
-  res.json({ success: true, totalUsers: Object.keys(s.messages).length, totalMsgs: Object.values(s.messages).reduce((a,b)=>a+b,0), media: s.media, allUsers: database.getUserCount() });
+  res.json({ success: true, totalUsers: Object.keys(s.messages).length, totalMsgs: Object.values(s.messages).reduce((a, b) => a + b, 0), media: s.media, allUsers: database.getUserCount() });
 });
 
-app.get('/api/users', requireAuth, (req, res) => {
-  res.json({ success: true, users: database.getAllUsers(), count: database.getUserCount() });
-});
+app.get('/api/users', requireAuth, (req, res) => res.json({ success: true, users: database.getAllUsers(), count: database.getUserCount() }));
 
 app.post('/api/send-message', requireAuth, async (req, res) => {
   const { jid, message, imageUrl } = req.body;
   if (!jid || !message) return res.json({ success: false, message: 'JID + message required' });
   if (!isConnected || !sock) return res.json({ success: false, message: 'Bot not connected!' });
   try {
-    const target = jid.includes('@') ? jid : `${jid.replace(/\D/g,'')}@s.whatsapp.net`;
+    const target = jid.includes('@') ? jid : `${jid.replace(/\D/g, '')}@s.whatsapp.net`;
     if (imageUrl) await sock.sendMessage(target, { image: { url: imageUrl }, caption: message });
     else await sock.sendMessage(target, { text: message });
-    res.json({ success: true, message: `✅ Sent!` });
+    res.json({ success: true });
   } catch (e) { res.json({ success: false, message: e.message }); }
 });
 
@@ -428,14 +418,14 @@ app.post('/api/channel-react', requireAuth, async (req, res) => {
   if (!channelLink || !emoji) return res.json({ success: false, message: 'Link + emoji required' });
   if (!isConnected || !sock) return res.json({ success: false, message: 'Bot not connected!' });
   try {
-    const code = channelLink.replace(/https?:\/\/(www\.)?whatsapp\.com\/channel\//,'').split('/')[0].trim();
+    const code = channelLink.replace(/https?:\/\/(www\.)?whatsapp\.com\/channel\//, '').split('/')[0].trim();
     const channelJid = `${code}@newsletter`;
-    const reactCount = Math.min(parseInt(count)||10, 100);
+    const reactCount = Math.min(parseInt(count) || 10, 100);
     let sent = 0;
-    const msgs = await sock.fetchMessagesFromWABox(channelJid, { count: 5 }).catch(()=>[]);
-    for (const m of (msgs||[]).slice(0,5)) {
-      for (let i = 0; i < Math.ceil(reactCount/Math.max((msgs||[]).length,1)) && sent < reactCount; i++) {
-        try { await sock.sendMessage(channelJid, { react: { text: emoji, key: m.key } }); sent++; await new Promise(r=>setTimeout(r,400)); } catch(e){}
+    const msgs = await sock.fetchMessagesFromWABox(channelJid, { count: 5 }).catch(() => []);
+    for (const m of (msgs || []).slice(0, 5)) {
+      for (let i = 0; i < Math.ceil(reactCount / Math.max((msgs || []).length, 1)) && sent < reactCount; i++) {
+        try { await sock.sendMessage(channelJid, { react: { text: emoji, key: m.key } }); sent++; await new Promise(r => setTimeout(r, 400)); } catch (e) {}
       }
     }
     res.json({ success: true, message: `✅ ${sent} reacts sent!`, sent });
@@ -445,35 +435,25 @@ app.post('/api/channel-react', requireAuth, async (req, res) => {
 app.get('/api/config', requireAuth, (req, res) => {
   try {
     delete require.cache[require.resolve('./src/config')];
-    const cfg = require('./src/config');
-    // Remove locked fields from response so panel can't edit them
-    const safe = { ...cfg };
-    delete safe.ownerNumber;
-    delete safe.logoImage;
-    delete safe.menuImage;
-    delete safe.connectImage;
-    delete safe.apiKey;
-    res.json({ success: true, config: safe });
+    const cfg = { ...require('./src/config') };
+    delete cfg.ownerNumber; delete cfg.logoImage; delete cfg.menuImage;
+    delete cfg.connectImage; delete cfg.apiKey;
+    res.json({ success: true, config: cfg });
   } catch (e) { res.json({ success: false, error: e.message }); }
 });
 
 app.post('/api/config', requireAuth, (req, res) => {
   try {
     const updates = req.body;
+    delete updates.ownerNumber; delete updates.ownerName; delete updates.logoImage;
+    delete updates.menuImage; delete updates.connectImage; delete updates.apiKey;
+
     const cfgPath = path.join(__dirname, 'src/config.js');
     let content = fs.readFileSync(cfgPath, 'utf8');
 
-    // LOCKED - these cannot be changed via panel
-    delete updates.ownerNumber;
-    delete updates.ownerName;
-    delete updates.logoImage;
-    delete updates.menuImage;
-    delete updates.connectImage;
-    delete updates.apiKey;
-
-    const boolKeys = ['alwaysOnline','autoTyping','autoSeen','autoStatusSeen','autoStatusLike',
-      'autoStatusSave','autoStatusReply','greetingAutoReply','aiMode','antiCall','antiDelete',
-      'oneViewReveal','autoContactSave'];
+    const boolKeys = ['alwaysOnline', 'autoTyping', 'autoSeen', 'autoStatusSeen', 'autoStatusLike',
+      'autoStatusSave', 'autoStatusReply', 'greetingAutoReply', 'aiMode', 'antiCall', 'antiDelete',
+      'oneViewReveal', 'autoContactSave'];
     boolKeys.forEach(key => {
       if (updates[key] !== undefined) {
         const val = updates[key] === 'true' || updates[key] === true;
@@ -482,17 +462,17 @@ app.post('/api/config', requireAuth, (req, res) => {
       }
     });
 
-    const strKeys = ['botName','prefix','autoStatusLikeEmoji','autoStatusReplyMessage','panelUrl','githubRepo','watermark'];
+    const strKeys = ['botName', 'prefix', 'autoStatusLikeEmoji', 'autoStatusReplyMessage', 'panelUrl', 'githubRepo', 'watermark'];
     strKeys.forEach(key => {
       if (updates[key] !== undefined) {
-        content = content.replace(new RegExp(`(${key}:\\s*')([^']*)(')`, 'g'), `$1${updates[key].replace(/'/g,"\\'")}$3`);
+        content = content.replace(new RegExp(`(${key}:\\s*')([^']*)(')`, 'g'), `$1${updates[key].replace(/'/g, "\\'")}$3`);
         config[key] = updates[key];
       }
     });
 
     fs.writeFileSync(cfgPath, content);
     delete require.cache[require.resolve('./src/config')];
-    if (isConnected && sock) try { sock.sendMessage(sock.user.id, { text: `⚙️ Settings updated!\n\n> 💎 *CHALAH MD*` }); } catch(e){}
+    if (isConnected && sock) try { sock.sendMessage(sock.user.id, { text: `⚙️ Settings updated!\n\n> 💎 *CHALAH MD*` }); } catch (e) {}
     res.json({ success: true });
   } catch (e) { res.json({ success: false, error: e.message }); }
 });
@@ -516,7 +496,7 @@ app.post('/api/update', requireAuth, async (req, res) => {
     if (st.behind > 0) {
       await git.pull();
       res.json({ success: true, message: `✅ ${st.behind} commits! Restarting...` });
-      if (isConnected && sock) try { await sock.sendMessage(sock.user.id, { text: `🔄 Panel update done! Restarting...\n\n> 💎 *CHALAH MD*` }); } catch(e){}
+      if (isConnected && sock) try { await sock.sendMessage(sock.user.id, { text: `🔄 Updated!\n\n> 💎 *CHALAH MD*` }); } catch (e) {}
       setTimeout(() => process.exit(0), 2000);
     } else { res.json({ success: true, message: '✅ Already latest!' }); }
   } catch (e) { res.json({ success: false, error: e.message }); }
@@ -532,20 +512,16 @@ io.on('connection', (socket) => {
   catch (e) { socket.emit('statusUpdate', { status: 'disconnected', connected: false }); }
 });
 
-// 24/7 self-ping
+// 24/7 self-ping for Render
 cron.schedule('*/14 * * * *', async () => {
   if (config.panelUrl && !config.panelUrl.includes('localhost'))
-    try { await axios.get(`${config.panelUrl}/ping`, { timeout: 5000 }); } catch(e){}
+    try { await axios.get(`${config.panelUrl}/ping`, { timeout: 5000 }); } catch (e) {}
 });
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`\n💎 CHALAH MD v3.0 | Port: ${PORT}`);
   console.log(`🌐 Panel:   http://0.0.0.0:${PORT}`);
   console.log(`📱 Connect: http://0.0.0.0:${PORT}/connect\n`);
-  if (fs.existsSync(path.join(AUTH_DIR, 'creds.json'))) {
-    console.log('[BOT] Session found → Starting...');
-    startBot();
-  } else {
-    console.log('[BOT] No session → /connect or /connect (Session ID)');
-  }
+  if (fs.existsSync(path.join(AUTH_DIR, 'creds.json'))) { console.log('[BOT] Session found → Starting...'); startBot(); }
+  else console.log('[BOT] No session → /connect');
 });
