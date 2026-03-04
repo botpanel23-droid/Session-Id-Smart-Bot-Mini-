@@ -24,7 +24,7 @@ module.exports = {
   autoStatusLikeEmoji: '❤️',
   autoStatusSave: false,
   autoStatusReply: true,
-  autoStatusReplyMessage: '✨ Status කියෙව්වා!',
+  autoStatusReplyMessage: '✨ Your Status Reade By > CHALAH MD MINI!',
   greetingAutoReply: true,
   greetingKeywords: ['hi','hello','hii','hey','hy','හෙලෝ','හායි'],
 
